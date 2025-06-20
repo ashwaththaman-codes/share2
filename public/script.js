@@ -3,7 +3,7 @@ const peerConnection = new RTCPeerConnection();
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
   .then(stream => {
     localVideo.srcObject = stream;
     stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
@@ -42,5 +42,6 @@ async function makeCall() {
   socket.emit('signal', { description: offer });
 }
 
-// Call automatically when ready
+// Start screen sharing automatically
 makeCall();
+
