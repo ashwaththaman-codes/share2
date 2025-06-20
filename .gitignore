@@ -1,0 +1,14 @@
+# Node modules (do not upload libraries)
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables (if you use .env for secrets)
+.env
+
+# OS-specific files
+.DS_Store
+Thumbs.db
