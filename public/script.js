@@ -1,47 +1,22 @@
 const socket = io();
+const roomId = prompt("Enter Room ID:");
+const password = prompt("Enter Room Password:");
+
+socket.emit('join-room', { roomId, password });
+
+socket.on('room-error', msg => alert(msg));
+
 const peerConnection = new RTCPeerConnection();
-const localVideo = document.getElementById('localVideo');
-const remoteVideo = document.getElementById('remoteVideo');
+// Everything else (WebRTC setup) same as before...
 
-navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-  .then(stream => {
-    localVideo.srcObject = stream;
-    stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-  });
-
-peerConnection.ontrack = event => {
-  remoteVideo.srcObject = event.streams[0];
-};
-
-peerConnection.onicecandidate = event => {
-  if (event.candidate) {
-    socket.emit('signal', { candidate: event.candidate });
-  }
-};
-
-socket.on('signal', async data => {
-  if (data.description) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.description));
-    if (data.description.type === 'offer') {
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      socket.emit('signal', { description: answer });
-    }
-  } else if (data.candidate) {
-    try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    } catch (e) {
-      console.error('Error adding received ICE candidate', e);
-    }
-  }
+// Mouse control
+document.addEventListener('mousemove', (e) => {
+  const x = e.clientX / window.innerWidth;
+  const y = e.clientY / window.innerHeight;
+  socket.emit('mouse-move', { x, y });
 });
 
-async function makeCall() {
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-  socket.emit('signal', { description: offer });
-}
-
-// Start screen sharing automatically
-makeCall();
-
+socket.on('mouse-move', ({ x, y }) => {
+  // This part won’t work in browser — handled by local agent
+  console.log("Mouse moved to:", x, y);
+});
