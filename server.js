@@ -1,23 +1,23 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const path = require('path');
+const rooms = {};
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+io.on('connection', socket => {
+  socket.on('join-room', ({ roomId, password }) => {
+    if (rooms[roomId] && rooms[roomId].password !== password) {
+      socket.emit('room-error', 'Incorrect password');
+      return;
+    }
 
-app.use(express.static(path.join(__dirname, 'public')));
+    socket.join(roomId);
+    rooms[roomId] = { password };
 
-io.on('connection', (socket) => {
-    console.log('A user connected');
-    socket.on('signal', (data) => {
-        socket.broadcast.emit('signal', data);
+    socket.to(roomId).emit('peer-connected');
+
+    socket.on('signal', data => {
+      socket.to(roomId).emit('signal', data);
     });
-    socket.on('disconnect', () => {
-        console.log('A user disconnected');
+
+    socket.on('mouse-move', data => {
+      socket.to(roomId).emit('mouse-move', data);
     });
+  });
 });
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
