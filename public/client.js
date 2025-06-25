@@ -1,24 +1,14 @@
 const socket = io();
 let peerConnection;
-let video = document.getElementById("video");
 let room = "";
-let isHost = false;
-
-// Room from URL
-window.onload = () => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.has("room")) {
-    room = params.get("room");
-    document.getElementById("room").value = room;
-  }
-};
+const video = document.getElementById("video");
+const fakeCursor = document.getElementById("fakeCursor");
 
 function startHost() {
-  room = document.getElementById("room").value.trim() || generateRoomCode();
-  isHost = true;
-  window.history.pushState({}, "", `?room=${room}`);
+  room = document.getElementById("room").value.trim();
+  if (!room) return alert("Enter room code");
+
   socket.emit("join", room);
-  console.log("Hosting room:", room);
 
   navigator.mediaDevices.getDisplayMedia({ video: true }).then(stream => {
     video.srcObject = stream;
@@ -33,38 +23,46 @@ function startHost() {
       }
     };
 
+    socket.on("signal", async ({ data }) => {
+      if (data.answer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      } else if (data.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+
     peerConnection.createOffer().then(offer => {
       peerConnection.setLocalDescription(offer);
       socket.emit("signal", { room, data: { offer } });
     });
 
-    socket.on("signal", async ({ data }) => {
-      if (data.answer) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-      }
+    socket.on("mouseMove", ({ x, y }) => {
+      const bounds = video.getBoundingClientRect();
+      fakeCursor.style.left = bounds.left + x * bounds.width + "px";
+      fakeCursor.style.top = bounds.top + y * bounds.height + "px";
+      fakeCursor.style.display = "block";
     });
 
-    socket.on("mouseMove", ({ x, y }) => moveFakeCursor(x, y));
-    socket.on("mouseClick", ({ button }) => console.log("Mouse click:", button));
+    socket.on("mouseClick", ({ button }) => {
+      console.log("Mouse click:", button);
+    });
   }).catch(err => {
-    alert("Screen share failed: " + err.message);
+    alert("Failed to share screen: " + err.message);
   });
 }
 
 function startClient() {
   room = document.getElementById("room").value.trim();
-  if (!room) return alert("Room ID is required");
+  if (!room) return alert("Enter room code");
 
-  isHost = false;
   socket.emit("join", room);
-  console.log("Client joining room:", room);
 
   peerConnection = new RTCPeerConnection();
 
   peerConnection.ontrack = event => {
     video.srcObject = event.streams[0];
     video.style.display = "block";
-    enableCursorSharing();
+    setupCursorControl();
   };
 
   peerConnection.onicecandidate = event => {
@@ -85,13 +83,7 @@ function startClient() {
   });
 }
 
-function generateRoomCode() {
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  document.getElementById("room").value = code;
-  return code;
-}
-
-function enableCursorSharing() {
+function setupCursorControl() {
   video.addEventListener("mousemove", e => {
     const bounds = video.getBoundingClientRect();
     const x = ((e.clientX - bounds.left) / bounds.width).toFixed(3);
@@ -102,12 +94,4 @@ function enableCursorSharing() {
   video.addEventListener("click", () => {
     socket.emit("mouseClick", { room, button: "left" });
   });
-}
-
-function moveFakeCursor(x, y) {
-  const cursor = document.getElementById("fakeCursor");
-  const bounds = video.getBoundingClientRect();
-  cursor.style.left = bounds.left + x * bounds.width + "px";
-  cursor.style.top = bounds.top + y * bounds.height + "px";
-  cursor.style.display = "block";
 }
