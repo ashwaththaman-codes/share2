@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -15,13 +14,16 @@ app.get("/", (req, res) => {
 });
 
 io.on("connection", socket => {
+  console.log("Client connected:", socket.id);
+
   socket.on("join", room => {
     socket.join(room);
-    console.log(`User joined room: ${room}`);
+    console.log(`Client ${socket.id} joined room: ${room}`);
   });
 
   socket.on("signal", ({ room, data }) => {
     socket.to(room).emit("signal", { data });
+    console.log(`Signal relayed in room ${room}`);
   });
 
   socket.on("mouseMove", ({ room, x, y }) => {
@@ -33,7 +35,7 @@ io.on("connection", socket => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Client disconnected");
+    console.log("Client disconnected:", socket.id);
   });
 });
 
