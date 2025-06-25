@@ -1,19 +1,18 @@
-<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>WebDesk – Remote Desktop</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>WebDesk Remote Desktop</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="container">
-    <h1>WebDesk Remote Desktop</h1>
-    <input type="text" id="room" placeholder="Enter or create room code">
-    <br>
+    <h1>WebDesk – Remote Desktop</h1>
+    <input type="text" id="room" placeholder="Enter or create room code" />
+    <br />
     <button onclick="startHost()">Start Session (Host)</button>
     <button onclick="startClient()">Join Session (Client)</button>
-    <video id="video" autoplay muted></video>
+    <video id="video" autoplay playsinline></video>
     <div id="fakeCursor"></div>
   </div>
 
