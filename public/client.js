@@ -1,15 +1,15 @@
-// public/client.js
 const socket = io();
 let peerConnection;
 let video = document.getElementById("video");
 let room = "";
 let isHost = false;
 
-// Join room from URL if available
+// Join from URL if room param exists
 window.onload = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has("room")) {
-    document.getElementById("room").value = urlParams.get("room");
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("room")) {
+    room = params.get("room");
+    document.getElementById("room").value = room;
   }
 };
 
@@ -18,6 +18,7 @@ function startHost() {
   isHost = true;
   window.history.pushState({}, "", `?room=${room}`);
   socket.emit("join", room);
+  console.log("Hosting room:", room);
 
   navigator.mediaDevices.getDisplayMedia({ video: true }).then(stream => {
     video.srcObject = stream;
@@ -26,8 +27,10 @@ function startHost() {
     peerConnection = new RTCPeerConnection();
     stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 
-    peerConnection.onicecandidate = e => {
-      if (e.candidate) socket.emit("signal", { room, data: { candidate: e.candidate } });
+    peerConnection.onicecandidate = event => {
+      if (event.candidate) {
+        socket.emit("signal", { room, data: { candidate: event.candidate } });
+      }
     };
 
     peerConnection.createOffer().then(offer => {
@@ -36,39 +39,51 @@ function startHost() {
     });
 
     socket.on("signal", async ({ data }) => {
-      if (data.answer) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      console.log("Host received signal:", data);
+      if (data.answer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        console.log("Host received answer");
+      }
     });
 
     socket.on("mouseMove", ({ x, y }) => moveFakeCursor(x, y));
-    socket.on("mouseClick", ({ button }) => console.log("Client clicked:", button));
+    socket.on("mouseClick", ({ button }) => console.log("Mouse click:", button));
+  }).catch(err => {
+    alert("Screen share failed: " + err.message);
   });
 }
 
 function startClient() {
   room = document.getElementById("room").value.trim();
+  if (!room) return alert("Room ID is required");
+
   isHost = false;
   socket.emit("join", room);
+  console.log("Client joining room:", room);
 
   peerConnection = new RTCPeerConnection();
 
-  peerConnection.ontrack = e => {
-    video.srcObject = e.streams[0];
+  peerConnection.ontrack = event => {
+    console.log("Client received stream");
+    video.srcObject = event.streams[0];
     video.style.display = "block";
     enableCursorSharing();
   };
 
-  peerConnection.onicecandidate = e => {
-    if (e.candidate) socket.emit("signal", { room, data: { candidate: e.candidate } });
+  peerConnection.onicecandidate = event => {
+    if (event.candidate) {
+      socket.emit("signal", { room, data: { candidate: event.candidate } });
+    }
   };
 
   socket.on("signal", async ({ data }) => {
+    console.log("Client received signal:", data);
     if (data.offer) {
       await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       socket.emit("signal", { room, data: { answer } });
-    }
-    if (data.candidate) {
+    } else if (data.candidate) {
       await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
     }
   });
@@ -88,7 +103,7 @@ function enableCursorSharing() {
     socket.emit("mouseMove", { room, x, y });
   });
 
-  video.addEventListener("click", e => {
+  video.addEventListener("click", () => {
     socket.emit("mouseClick", { room, button: "left" });
   });
 }
