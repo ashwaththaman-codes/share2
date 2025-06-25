@@ -1,7 +1,7 @@
 body {
-  background: #121212;
+  background: #111;
   color: #fff;
-  font-family: sans-serif;
+  font-family: Arial, sans-serif;
   text-align: center;
 }
 .container {
@@ -26,3 +26,4 @@ video {
   pointer-events: none;
   z-index: 9999;
 }
+
