@@ -1,6 +1,7 @@
 {
-  "name": "webdesk-app",
+  "name": "webdesk-remote-session",
   "version": "1.0.0",
+  "description": "Remote screen sharing app with fake cursor control using WebRTC + Socket.io",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -8,5 +9,11 @@
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.5.4"
-  }
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": [],
+  "author": "your-name",
+  "license": "MIT"
 }
