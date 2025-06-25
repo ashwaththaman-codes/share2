@@ -1,23 +1,41 @@
-const rooms = {};
+// server.js
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
 
-io.on('connection', socket => {
-  socket.on('join-room', ({ roomId, password }) => {
-    if (rooms[roomId] && rooms[roomId].password !== password) {
-      socket.emit('room-error', 'Incorrect password');
-      return;
-    }
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-    socket.join(roomId);
-    rooms[roomId] = { password };
+app.use(express.static("public"));
 
-    socket.to(roomId).emit('peer-connected');
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
+});
 
-    socket.on('signal', data => {
-      socket.to(roomId).emit('signal', data);
-    });
+io.on("connection", socket => {
+  socket.on("join", room => {
+    socket.join(room);
+    console.log(`User joined room: ${room}`);
+  });
 
-    socket.on('mouse-move', data => {
-      socket.to(roomId).emit('mouse-move', data);
-    });
+  socket.on("signal", ({ room, data }) => {
+    socket.to(room).emit("signal", { data });
+  });
+
+  socket.on("mouseMove", ({ room, x, y }) => {
+    socket.to(room).emit("mouseMove", { x, y });
+  });
+
+  socket.on("mouseClick", ({ room, button }) => {
+    socket.to(room).emit("mouseClick", { button });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
   });
 });
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
