@@ -7,7 +7,6 @@ const fakeCursor = document.getElementById("fakeCursor");
 function startHost() {
   room = document.getElementById("room").value.trim();
   if (!room) return alert("Enter room code");
-
   socket.emit("join", room);
 
   navigator.mediaDevices.getDisplayMedia({ video: true }).then(stream => {
@@ -15,6 +14,7 @@ function startHost() {
     video.style.display = "block";
 
     peerConnection = new RTCPeerConnection();
+
     stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 
     peerConnection.onicecandidate = event => {
@@ -46,15 +46,15 @@ function startHost() {
     socket.on("mouseClick", ({ button }) => {
       console.log("Mouse click:", button);
     });
+
   }).catch(err => {
-    alert("Failed to share screen: " + err.message);
+    alert("Error sharing screen: " + err.message);
   });
 }
 
 function startClient() {
   room = document.getElementById("room").value.trim();
   if (!room) return alert("Enter room code");
-
   socket.emit("join", room);
 
   peerConnection = new RTCPeerConnection();
