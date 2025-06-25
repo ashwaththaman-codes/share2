@@ -1,26 +1,28 @@
 body {
-  font-family: 'Segoe UI', sans-serif;
   background: #121212;
   color: #fff;
+  font-family: sans-serif;
   text-align: center;
-  padding: 20px;
+}
+.container {
+  padding: 30px;
 }
 input, button {
   padding: 10px;
-  margin: 10px;
+  margin: 5px;
 }
 video {
-  width: 100%;
   margin-top: 20px;
-  border-radius: 8px;
+  width: 90%;
+  border-radius: 10px;
 }
 #fakeCursor {
   width: 20px;
   height: 20px;
-  background-color: #00bcd4;
-  position: absolute;
+  background: cyan;
   border-radius: 50%;
-  pointer-events: none;
+  position: absolute;
   display: none;
-  z-index: 1000;
+  pointer-events: none;
+  z-index: 9999;
 }
