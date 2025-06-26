@@ -7,14 +7,23 @@ body {
 .container {
   padding: 30px;
 }
+#status {
+  margin: 10px 0;
+  color: #ccc;
+}
 input, button {
   padding: 10px;
   margin: 5px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 video {
   margin-top: 20px;
   width: 90%;
   border-radius: 10px;
+  display: none;
 }
 #fakeCursor {
   width: 20px;
@@ -26,5 +35,3 @@ video {
   pointer-events: none;
   z-index: 9999;
 }
-
-
