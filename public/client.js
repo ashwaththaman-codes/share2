@@ -5,6 +5,7 @@ const socket = io({
   reconnectionAttempts: 5,
   reconnectionDelay: 1000
 });
+
 let peerConnection;
 let room = "";
 let isJoined = false; // Prevent duplicate joins
