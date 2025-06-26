@@ -23,8 +23,9 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Track hosts per room
+// Track hosts and pending signals per room
 const rooms = new Map();
+const pendingSignals = new Map();
 
 io.on('connection', socket => {
   console.log('User connected:', socket.id);
@@ -39,6 +40,14 @@ io.on('connection', socket => {
       }
       rooms.set(room, socket.id);
       console.log(`Host added: room=${room}, host=${socket.id}`);
+      // Send any pending signals to the new host
+      if (pendingSignals.has(room)) {
+        pendingSignals.get(room).forEach(signal => {
+          console.log(`Sending pending signal to host ${socket.id}:`, signal);
+          socket.emit('signal', signal);
+        });
+        pendingSignals.delete(room);
+      }
     } else if (!rooms.has(room)) {
       console.log(`No host in room: ${room}`);
       socket.emit('no-host', 'No host found in room: ' + room);
@@ -52,7 +61,16 @@ io.on('connection', socket => {
 
   socket.on('signal', ({ room, data }) => {
     console.log(`Signal from ${socket.id} to room ${room}:`, data);
-    socket.to(room).emit('signal', { id: socket.id, data });
+    const targetSocket = io.sockets.adapter.rooms.get(room);
+    if (targetSocket && targetSocket.size > 1) {
+      socket.to(room).emit('signal', { id: socket.id, data });
+    } else {
+      console.log(`No other users in room ${room}, buffering signal from ${socket.id}`);
+      if (!pendingSignals.has(room)) {
+        pendingSignals.set(room, []);
+      }
+      pendingSignals.get(room).push({ id: socket.id, data });
+    }
   });
 
   socket.on('mouseMove', ({ room, x, y }) => {
@@ -68,6 +86,7 @@ io.on('connection', socket => {
     socket.leave(room);
     if (rooms.get(room) === socket.id) {
       rooms.delete(room);
+      pendingSignals.delete(room);
       socket.to(room).emit('user-disconnected', socket.id);
       console.log(`Host removed: room=${room}`);
     }
@@ -78,6 +97,7 @@ io.on('connection', socket => {
     rooms.forEach((hostId, room) => {
       if (hostId === socket.id) {
         rooms.delete(room);
+        pendingSignals.delete(room);
         socket.to(room).emit('user-disconnected', socket.id);
         console.log(`Host disconnected: room=${room}`);
       }
