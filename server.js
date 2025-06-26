@@ -10,7 +10,9 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"]
   },
-  transports: ['websocket']
+  transports: ['websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Serve static files from /public
@@ -87,6 +89,10 @@ io.on('connection', socket => {
   });
 });
 
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
