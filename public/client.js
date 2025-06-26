@@ -9,6 +9,7 @@ const clientButton = document.querySelector('button[onclick="startClient()"]');
 const statusDiv = document.getElementById("status");
 
 function updateUI(state, message) {
+  console.log(`UI Update: ${state} - ${message}`);
   statusDiv.textContent = message;
   roomInput.disabled = state === "connected";
   hostButton.disabled = state === "connected";
@@ -36,6 +37,7 @@ function startHost() {
       updateUI("connected", "Hosting session in room: " + room);
 
       stream.getVideoTracks()[0].onended = () => {
+        console.log("Screen sharing stopped");
         video.srcObject = null;
         video.style.display = "none";
         fakeCursor.style.display = "none";
@@ -45,27 +47,40 @@ function startHost() {
       };
 
       peerConnection = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" }
+          // Add TURN server if available: { urls: "turn:your.turn.server", username: "", credential: "" }
+        ]
       });
 
       stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 
       peerConnection.onicecandidate = event => {
         if (event.candidate) {
+          console.log("Sending ICE candidate from host");
           socket.emit("signal", { room, data: { candidate: event.candidate } });
+        }
+      };
+
+      peerConnection.onconnectionstatechange = () => {
+        console.log("Host WebRTC state:", peerConnection.connectionState);
+        if (peerConnection.connectionState === "failed") {
+          updateUI("error", "Connection failed. Please try again.");
         }
       };
 
       socket.on("signal", async ({ data }) => {
         try {
+          console.log("Host received signal:", data);
           if (data.answer) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
           } else if (data.candidate) {
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
           }
         } catch (err) {
-          console.error("Signaling error:", err);
-          updateUI("error", "Connection error. Please try again.");
+          console.error("Host signaling error:", err);
+          updateUI("error", "Connection error: " + err.message);
         }
       });
 
@@ -74,6 +89,7 @@ function startHost() {
       });
 
       socket.on("user-disconnected", () => {
+        console.log("Client disconnected");
         video.srcObject = null;
         video.style.display = "none";
         fakeCursor.style.display = "none";
@@ -81,11 +97,17 @@ function startHost() {
       });
 
       peerConnection.createOffer()
-        .then(offer => peerConnection.setLocalDescription(offer))
-        .then(() => socket.emit("signal", { room, data: { offer: peerConnection.localDescription } }))
+        .then(offer => {
+          console.log("Host created offer");
+          return peerConnection.setLocalDescription(offer);
+        })
+        .then(() => {
+          console.log("Host sending offer");
+          socket.emit("signal", { room, data: { offer: peerConnection.localDescription } });
+        })
         .catch(err => {
-          console.error("Offer creation error:", err);
-          updateUI("error", "Failed to create offer. Please try again.");
+          console.error("Host offer creation error:", err);
+          updateUI("error", "Failed to create offer: " + err.message);
         });
 
       let lastMove = 0;
@@ -121,10 +143,15 @@ function startClient() {
   }
 
   peerConnection = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" }
+      // Add TURN server if available: { urls: "turn:your.turn.server", username: "", credential: "" }
+    ]
   });
 
   peerConnection.ontrack = event => {
+    console.log("Client received stream");
     video.srcObject = event.streams[0];
     video.style.display = "block";
     setupCursorControl();
@@ -133,37 +160,56 @@ function startClient() {
 
   peerConnection.onicecandidate = event => {
     if (event.candidate) {
+      console.log("Sending ICE candidate from client");
       socket.emit("signal", { room, data: { candidate: event.candidate } });
+    }
+  };
+
+  peerConnection.onconnectionstatechange = () => {
+    console.log("Client WebRTC state:", peerConnection.connectionState);
+    if (peerConnection.connectionState === "failed") {
+      updateUI("error", "Connection failed. Please try again.");
     }
   };
 
   socket.on("signal", async ({ data }) => {
     try {
+      console.log("Client received signal:", data);
       if (data.offer) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
+        console.log("Client sending answer");
         socket.emit("signal", { room, data: { answer: peerConnection.localDescription } });
       } else if (data.candidate) {
         await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
       }
     } catch (err) {
-      console.error("Signaling error:", err);
-      updateUI("error", "Connection error. Please try again.");
+      console.error("Client signaling error:", err);
+      updateUI("error", "Connection error: " + err.message);
     }
   });
 
   socket.on("no-host", () => {
+    console.log("No host in room:", room);
     updateUI("error", "No host found in room: " + room);
   });
 
   socket.on("user-disconnected", () => {
+    console.log("Host disconnected");
     video.srcObject = null;
     video.style.display = "none";
     updateUI("disconnected", "Host disconnected. Enter a room code to join another session.");
   });
 
   socket.emit("join", { room, isHost: false });
+
+  // Timeout if no connection is established
+  setTimeout(() => {
+    if (peerConnection.connectionState !== "connected") {
+      updateUI("error", "Connection timed out. Please try again.");
+    }
+  }, 10000);
 }
 
 function setupCursorControl() {
@@ -182,6 +228,11 @@ function setupCursorControl() {
   });
 }
 
-socket.on("connect_error", () => {
-  updateUI("error", "Failed to connect to the server. Please check your connection.");
+socket.on("connect_error", err => {
+  console.error("Socket.IO connect error:", err);
+  updateUI("error", "Failed to connect to the server: " + err.message);
+});
+
+socket.on("connect", () => {
+  console.log("Socket.IO connected");
 });
