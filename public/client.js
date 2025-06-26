@@ -43,7 +43,7 @@ function createPeerConnection(isHost) {
   
   peerConnection.onicecandidate = event => {
     if (event.candidate) {
-      console.log(`${isHost ? "Host" : "Client"} sending ICE candidate:`, event.candidate);
+      console.log(`${isHost ? "Host" : "Client"} sending ICE candidate:`, JSON.stringify(event.candidate, null, 2));
       socket.emit("signal", { room, data: { candidate: event.candidate } });
     }
   };
@@ -101,7 +101,7 @@ function startHost() {
 
       socket.on("signal", async ({ data }) => {
         try {
-          console.log("Host received signal:", data);
+          console.log("Host received signal:", JSON.stringify(data, null, 2));
           if (data.answer) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             console.log("Host set remote description (answer)");
@@ -131,7 +131,7 @@ function startHost() {
 
       peerConnection.createOffer()
         .then(offer => {
-          console.log("Host created offer:", offer);
+          console.log("Host created offer:", JSON.stringify(offer, null, 2));
           return peerConnection.setLocalDescription(offer);
         })
         .then(() => {
@@ -177,6 +177,7 @@ function startClient(maxRetries = 3) {
 
   let retries = 0;
   function tryConnect() {
+    console.log(`Client connection attempt ${retries + 1}/${maxRetries}`);
     peerConnection = createPeerConnection(false);
 
     peerConnection.ontrack = event => {
@@ -189,13 +190,13 @@ function startClient(maxRetries = 3) {
 
     socket.on("signal", async ({ data }) => {
       try {
-        console.log("Client received signal:", data);
+        console.log("Client received signal:", JSON.stringify(data, null, 2));
         if (data.offer) {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
           console.log("Client set remote description (offer)");
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
-          console.log("Client sending answer:", peerConnection.localDescription);
+          console.log("Client sending answer:", JSON.stringify(peerConnection.localDescription, null, 2));
           socket.emit("signal", { room, data: { answer: peerConnection.localDescription } });
         } else if (data.candidate) {
           await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(err => {
@@ -263,13 +264,13 @@ function setupCursorControl() {
   });
 }
 
-socket.on("connect_error", err => {
-  console.error("Socket.IO connect error:", err);
-  updateUI("error", "Failed to connect to the server: " + err.message);
-});
-
 socket.on("connect", () => {
   console.log("Socket.IO connected");
+});
+
+socket.on("connect_error", err => {
+  console.error("Socket.IO connect error:", err.message);
+  updateUI("error", "Failed to connect to the server: " + err.message);
 });
 
 socket.on("reconnect_attempt", attempt => {
