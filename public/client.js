@@ -56,9 +56,14 @@ function startHost() {
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
-          // Free TURN server (example, replace with your own credentials)
+          { urls: "stun:stun2.l.google.com:19302" },
           {
             urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject"
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443",
             username: "openrelayproject",
             credential: "openrelayproject"
           }
@@ -158,9 +163,14 @@ function startClient() {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
-      // Free TURN server (example, replace with your own credentials)
+      { urls: "stun:stun2.l.google.com:19302" },
       {
         urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
         username: "openrelayproject",
         credential: "openrelayproject"
       }
@@ -201,7 +211,9 @@ function startClient() {
         console.log("Client sending answer:", peerConnection.localDescription);
         socket.emit("signal", { room, data: { answer: peerConnection.localDescription } });
       } else if (data.candidate) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(err => {
+          console.error("ICE candidate error:", err);
+        });
       }
     } catch (err) {
       console.error("Client signaling error:", err);
@@ -223,11 +235,12 @@ function startClient() {
 
   socket.emit("join", { room, isHost: false });
 
-  // Extended timeout for slower networks
   setTimeout(() => {
     if (peerConnection.connectionState !== "connected") {
       console.log("Connection timeout after 20 seconds");
       updateUI("error", "Connection timed out. Please try again.");
+      peerConnection?.close();
+      peerConnection = null;
     }
   }, 20000);
 }
