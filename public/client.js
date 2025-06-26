@@ -1,4 +1,10 @@
-const socket = io({ transports: ['websocket'], upgrade: false });
+const socket = io({
+  transports: ['websocket'],
+  upgrade: false,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
+});
 let peerConnection;
 let room = "";
 const video = document.getElementById("video");
@@ -49,8 +55,13 @@ function startHost() {
       peerConnection = new RTCPeerConnection({
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" }
-          // Add TURN server if available: { urls: "turn:your.turn.server", username: "", credential: "" }
+          { urls: "stun:stun1.l.google.com:19302" },
+          // Free TURN server (example, replace with your own credentials)
+          {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject"
+          }
         ]
       });
 
@@ -58,7 +69,7 @@ function startHost() {
 
       peerConnection.onicecandidate = event => {
         if (event.candidate) {
-          console.log("Sending ICE candidate from host");
+          console.log("Host sending ICE candidate:", event.candidate);
           socket.emit("signal", { room, data: { candidate: event.candidate } });
         }
       };
@@ -66,7 +77,7 @@ function startHost() {
       peerConnection.onconnectionstatechange = () => {
         console.log("Host WebRTC state:", peerConnection.connectionState);
         if (peerConnection.connectionState === "failed") {
-          updateUI("error", "Connection failed. Please try again.");
+          updateUI("error", "Host connection failed. Please try again.");
         }
       };
 
@@ -80,11 +91,12 @@ function startHost() {
           }
         } catch (err) {
           console.error("Host signaling error:", err);
-          updateUI("error", "Connection error: " + err.message);
+          updateUI("error", "Host connection error: " + err.message);
         }
       });
 
       socket.on("no-host", () => {
+        console.log("No host in room:", room);
         updateUI("error", "No host found in room: " + room);
       });
 
@@ -98,7 +110,7 @@ function startHost() {
 
       peerConnection.createOffer()
         .then(offer => {
-          console.log("Host created offer");
+          console.log("Host created offer:", offer);
           return peerConnection.setLocalDescription(offer);
         })
         .then(() => {
@@ -145,13 +157,18 @@ function startClient() {
   peerConnection = new RTCPeerConnection({
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" }
-      // Add TURN server if available: { urls: "turn:your.turn.server", username: "", credential: "" }
+      { urls: "stun:stun1.l.google.com:19302" },
+      // Free TURN server (example, replace with your own credentials)
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
     ]
   });
 
   peerConnection.ontrack = event => {
-    console.log("Client received stream");
+    console.log("Client received stream:", event.streams[0]);
     video.srcObject = event.streams[0];
     video.style.display = "block";
     setupCursorControl();
@@ -160,7 +177,7 @@ function startClient() {
 
   peerConnection.onicecandidate = event => {
     if (event.candidate) {
-      console.log("Sending ICE candidate from client");
+      console.log("Client sending ICE candidate:", event.candidate);
       socket.emit("signal", { room, data: { candidate: event.candidate } });
     }
   };
@@ -169,6 +186,8 @@ function startClient() {
     console.log("Client WebRTC state:", peerConnection.connectionState);
     if (peerConnection.connectionState === "failed") {
       updateUI("error", "Connection failed. Please try again.");
+    } else if (peerConnection.connectionState === "connected") {
+      console.log("Client successfully connected to host");
     }
   };
 
@@ -179,7 +198,7 @@ function startClient() {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        console.log("Client sending answer");
+        console.log("Client sending answer:", peerConnection.localDescription);
         socket.emit("signal", { room, data: { answer: peerConnection.localDescription } });
       } else if (data.candidate) {
         await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -204,12 +223,13 @@ function startClient() {
 
   socket.emit("join", { room, isHost: false });
 
-  // Timeout if no connection is established
+  // Extended timeout for slower networks
   setTimeout(() => {
     if (peerConnection.connectionState !== "connected") {
+      console.log("Connection timeout after 20 seconds");
       updateUI("error", "Connection timed out. Please try again.");
     }
-  }, 10000);
+  }, 20000);
 }
 
 function setupCursorControl() {
@@ -235,4 +255,8 @@ socket.on("connect_error", err => {
 
 socket.on("connect", () => {
   console.log("Socket.IO connected");
+});
+
+socket.on("reconnect_attempt", attempt => {
+  console.log("Socket.IO reconnect attempt:", attempt);
 });
