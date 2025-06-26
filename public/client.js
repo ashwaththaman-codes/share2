@@ -7,6 +7,7 @@ const socket = io({
 });
 let peerConnection;
 let room = "";
+let isJoined = false; // Prevent duplicate joins
 const video = document.getElementById("video");
 const fakeCursor = document.getElementById("fakeCursor");
 const roomInput = document.getElementById("room");
@@ -94,6 +95,7 @@ function startHost() {
         peerConnection?.close();
         updateUI("disconnected", "Session ended. Enter a room code to start or join again.");
         socket.emit("leave", room);
+        isJoined = false;
       };
 
       peerConnection = createPeerConnection(true);
@@ -157,7 +159,10 @@ function startHost() {
         console.log("Mouse click:", button);
       });
 
-      socket.emit("join", { room, isHost: true });
+      if (!isJoined) {
+        socket.emit("join", { room, isHost: true });
+        isJoined = true;
+      }
     })
     .catch(err => {
       console.error("Screen sharing error:", err);
@@ -226,26 +231,39 @@ function startClient(maxRetries = 3) {
       video.srcObject = null;
       video.style.display = "none";
       updateUI("disconnected", "Host disconnected. Enter a room code to join another session.");
+      isJoined = false;
     });
 
-    socket.emit("join", { room, isHost: false });
+    if (!isJoined) {
+      socket.emit("join", { room, isHost: false });
+      isJoined = true;
+    }
 
     setTimeout(() => {
       if (peerConnection?.connectionState !== "connected") {
-        console.log("Connection timeout after 20 seconds");
+        console.log("Connection timeout after 30 seconds");
         updateUI("error", "Connection timed out. Please try again.");
         peerConnection?.close();
         peerConnection = null;
+        isJoined = false;
         if (retries < maxRetries) {
           retries++;
           console.log(`Retrying connection (attempt ${retries}/${maxRetries})`);
           setTimeout(tryConnect, 2000);
         }
       }
-    }, 20000);
+    }, 30000);
   }
 
-  tryConnect();
+  // Wait for Socket.IO connection before joining
+  if (socket.connected) {
+    tryConnect();
+  } else {
+    socket.on("connect", () => {
+      console.log("Socket.IO connected, starting client join");
+      tryConnect();
+    });
+  }
 }
 
 function setupCursorControl() {
