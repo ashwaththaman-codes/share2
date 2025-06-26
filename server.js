@@ -1,29 +1,38 @@
-const express = require("express");
-const http = require("http");
-const path = require("path");
-const { Server } = require("socket.io");
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, "public")));
+// Serve static files from /public
+app.use(express.static(path.join(__dirname, 'public')));
 
-io.on("connection", socket => {
-  socket.on("join", room => {
+io.on('connection', socket => {
+  console.log('User connected:', socket.id);
+
+  socket.on('join', room => {
     socket.join(room);
+    socket.to(room).emit('user-joined', socket.id);
   });
 
-  socket.on("signal", ({ room, data }) => {
-    socket.to(room).emit("signal", { data });
+  socket.on('signal', (data) => {
+    const { room, signal } = data;
+    socket.to(room).emit('signal', { id: socket.id, signal });
   });
 
-  socket.on("mouseMove", ({ room, x, y }) => {
-    socket.to(room).emit("mouseMove", { x, y });
+  socket.on('mouseMove', data => {
+    socket.broadcast.emit('mouseMove', data);
   });
 
-  socket.on("mouseClick", ({ room, button }) => {
-    socket.to(room).emit("mouseClick", { button });
+  socket.on('mouseClick', () => {
+    socket.broadcast.emit('mouseClick');
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
   });
 });
 
