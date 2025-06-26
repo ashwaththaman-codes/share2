@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint for Render
 app.get('/health', (req, res) => {
+  console.log('Health check requested');
   res.status(200).send('OK');
 });
 
@@ -60,7 +61,7 @@ io.on('connection', socket => {
   });
 
   socket.on('signal', ({ room, data }) => {
-    console.log(`Signal from ${socket.id} to room ${room}:`, data);
+    console.log(`Signal from ${socket.id} to room ${room}:`, JSON.stringify(data, null, 2));
     const targetSocket = io.sockets.adapter.rooms.get(room);
     if (targetSocket && targetSocket.size > 1) {
       socket.to(room).emit('signal', { id: socket.id, data });
@@ -109,7 +110,13 @@ io.on('connection', socket => {
   });
 });
 
+// Explicitly bind to process.env.PORT
 const port = process.env.PORT || 3000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);
+});
+
+// Ensure server responds to Render's port detection
+server.on('listening', () => {
+  console.log(`Server confirmed listening on port ${port}`);
 });
